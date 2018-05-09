@@ -59,9 +59,9 @@ namespace DisCache
             var user = await cache.GetCacheAsync<User>("YorHa_2B");
             await context.Response.WriteAsync($"Username: {user.Username} --- Email: {user.Email}");
             */
-            List<string> yorha = await cache.GetKeyGroupAsync("YorHa");
-            List<string> rogue = await cache.GetKeyGroupAsync("Rogue");
-            List<string> god = await cache.GetKeyGroupAsync("God");
+            string[] yorha = await cache.GetKeyGroupAsync("YorHa");
+            string[] rogue = await cache.GetKeyGroupAsync("Rogue");
+            string[] god = await cache.GetKeyGroupAsync("God");
             await context.Response.WriteAsync("YorHa group:\n");
             foreach (string key in yorha)
             {
@@ -84,7 +84,8 @@ namespace DisCache
                 var user = await cache.GetCacheAsync<User>(key);
                 await context.Response.WriteAsync($"Username: {user.Username} --- Email: {user.Email}\n");
             }
-            await cache.RemoveCacheByGroupAsync("God");
+            cache.RemoveCacheByGroup("YorHa");
+            cache.FlushAllKeys();
         }
     }
 }
