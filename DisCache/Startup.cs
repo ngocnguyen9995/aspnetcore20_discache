@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DisCache
@@ -24,8 +21,22 @@ namespace DisCache
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
-            app.UserWriteCaching();
-            app.UserReadCaching();
+            app.WriteCacheToGroup(new WriteCacheOptions<User>
+            {
+                Group = "YorHa", 
+                Key = "2B",
+                Value = new User { Username = "2BisBestGrill", Email = "2BFanSub@nier.com" },
+            });
+            app.WriteCache(new WriteCacheOptions<User>
+            {
+                Key = "YorHa_9S",
+                Value = new User { Username = "9Sx2B4ever", Email = "9Sx2B4ever@nier.com"}
+            });
+
+            app.ReadCacheGroup<User>(new CacheQueryOptions
+            {
+                Group = "YorHa"
+            });
         }
     }
 }

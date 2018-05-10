@@ -2,67 +2,103 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Threading.Tasks;
-using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace DisCache
 {
     public static class UseMiddlewareExtension
     {
-        public static IApplicationBuilder UserWriteCaching(this IApplicationBuilder app)
+        public static IApplicationBuilder WriteCache<T>(this IApplicationBuilder app, WriteCacheOptions<T> options)
         {
-            return app.UseMiddleware<WriteCachingMiddleware>();
+            return app.UseMiddleware<WriteCacheMiddleware<T>>(options);
         }
 
-        public static IApplicationBuilder UserReadCaching(this IApplicationBuilder app)
+        public static IApplicationBuilder WriteCacheToGroup<T>(this IApplicationBuilder app, WriteCacheOptions<T> options)
         {
-            return app.UseMiddleware<ReadCachingMiddleware>();
+            return app.UseMiddleware<WriteCacheGroupMiddleware<T>>(options);
+        }
+
+        public static IApplicationBuilder ReadCache<T>(this IApplicationBuilder app, CacheQueryOptions options)
+        {
+            return app.UseMiddleware<ReadCacheMiddleware<T>>(options);
+        }
+
+        public static IApplicationBuilder ReadCacheGroup<T>(this IApplicationBuilder app, CacheQueryOptions options)
+        {
+            return app.UseMiddleware<ReadCacheGroupMiddlware<T>>(options);
         }
     }
 
-    public class WriteCachingMiddleware
+    public class WriteCacheMiddleware<T>
     {
         private readonly RequestDelegate next;
         private readonly IDistributedCache cache;
+        private readonly WriteCacheOptions<T> options;
 
-        public WriteCachingMiddleware(RequestDelegate next, IDistributedCache cache)
+        public WriteCacheMiddleware(RequestDelegate next, IDistributedCache cache, WriteCacheOptions<T> options)
         {
             this.next = next;
             this.cache = cache;
+            this.options = options;
         }
 
         public async Task Invoke(HttpContext context)
         {
-            await cache.AddCacheToGroupAsync("YorHa", "2B", new User{Username = "2BisBestGrill", Email = "2BFanSub@nier.com"});
-            await cache.AddCacheToGroupAsync("YorHa", "9S", new User { Username = "9Sx2B4ever", Email = "9Sx2B@nier.com" });
-            await cache.AddCacheToGroupAsync("YorHa", "6O", new User { Username = "Operator6O", Email = "LunarTear@nier.com" });
-            await cache.AddCacheToGroupAsync("Rogue", "A2", new User { Username = "A2Kills2B", Email = "A2IsMyWaifu@nier.com" });
-            await cache.AddCacheToGroupAsync("Rogue", "Emil", new User { Username = "Determination", Email = "BigHead@nier.com" });
-            await cache.AddCacheToGroupAsync("God", "YokoTaro", new User { Username = "ShitSquareEnix", Email = "YokoTaro@nier.com" });
-            await this.next(context);
+            await cache.SetCacheAsync(options.Key, options.Value, options.Options, options.Token);
+            await next(context);
         }
     }
 
-    public class ReadCachingMiddleware
+    public class WriteCacheGroupMiddleware<T>
     {
         private readonly RequestDelegate next;
         private readonly IDistributedCache cache;
+        private readonly WriteCacheOptions<T> options;
 
-        public ReadCachingMiddleware(RequestDelegate next, IDistributedCache cache)
+        public WriteCacheGroupMiddleware(RequestDelegate next, IDistributedCache cache, WriteCacheOptions<T> options)
         {
             this.next = next;
             this.cache = cache;
+            this.options = options;
         }
 
         public async Task Invoke(HttpContext context)
         {
+            await cache.AddCacheToGroupAsync(options.Group, options.Key, options.Value, options.Options, options.Token);
+            await next(context);
+        }
+    }
+
+    public class ReadCacheMiddleware<T>
+    {
+        private readonly RequestDelegate next;
+        private readonly IDistributedCache cache;
+        private readonly CacheQueryOptions options;
+
+        public ReadCacheMiddleware(RequestDelegate next, IDistributedCache cache, CacheQueryOptions options)
+        {
+            this.next = next;
+            this.cache = cache;
+            this.options = options;
+        }
+
+        public async Task Invoke(HttpContext context)
+        {
+            var data = cache.GetCacheAsync<T>(options.Key, options.Token);
+            await context.Response.WriteAsync($"Data: {JsonConvert.SerializeObject(data.Result)}");
+
+
             /*
-            var user = await cache.GetCacheAsync<User>("YorHa_2B");
-            await context.Response.WriteAsync($"Username: {user.Username} --- Email: {user.Email}");
-            */
-            string[] yorha = await cache.GetKeyGroupAsync("YorHa");
-            string[] rogue = await cache.GetKeyGroupAsync("Rogue");
-            string[] god = await cache.GetKeyGroupAsync("God");
-            await context.Response.WriteAsync("YorHa group:\n");
+            foreach (User user in yorhaGroup)
+            {
+                await context.Response.WriteAsync($"Username: {user.Username} --- Email: {user.Email}\n");
+            }
+
+            User[] rogueGroup = cache.GetCacheGroup<User>("Rogue");
+            foreach (User user in rogueGroup)
+            {
+                await context.Response.WriteAsync($"Username: {user.Username} --- Email: {user.Email}\n");
+            }
             foreach (string key in yorha)
             {
                 await context.Response.WriteAsync($"key: {key}\n");
@@ -84,8 +120,27 @@ namespace DisCache
                 var user = await cache.GetCacheAsync<User>(key);
                 await context.Response.WriteAsync($"Username: {user.Username} --- Email: {user.Email}\n");
             }
-            cache.RemoveCacheByGroup("YorHa");
-            cache.FlushAllKeys();
+            */
+        }
+    }
+
+    public class ReadCacheGroupMiddlware<T>
+    {
+        private readonly RequestDelegate next;
+        private readonly IDistributedCache cache;
+        private readonly CacheQueryOptions options;
+
+        public ReadCacheGroupMiddlware(RequestDelegate next, IDistributedCache cache, CacheQueryOptions options)
+        {
+            this.next = next;
+            this.cache = cache;
+            this.options = options;
+        }
+
+        public async Task Invoke(HttpContext context)
+        {
+            var data = cache.GetCacheGroupAsync<T>(options.Group, options.Token);
+            await context.Response.WriteAsync($"Data: {JsonConvert.SerializeObject(data.Result)}");
         }
     }
 }

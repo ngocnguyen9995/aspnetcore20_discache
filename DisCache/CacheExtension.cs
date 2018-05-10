@@ -24,7 +24,7 @@ namespace DisCache
         /// <param name="cache"></param>
         /// <param name="key"></param>
         /// <param name="val"></param>
-        /// <param name="token">cancellation token</param>
+        /// <param name="token"></param>
         /// <returns></returns>
         public static async Task SetCacheAsync<T>(this IDistributedCache cache, string key, T val, CancellationToken token = default(CancellationToken))
         {
@@ -46,7 +46,7 @@ namespace DisCache
         /// <param name="key"></param>
         /// <param name="val"></param>
         /// <param name="options">Options for the cache, including AbsoluteExpiration & SlidingExpiration</param>
-        /// <param name="token">Cancellation token</param>
+        /// <param name="token"></param>
         /// <returns></returns>
         public static async Task SetCacheAsync<T>(this IDistributedCache cache, string key, T val, DistributedCacheEntryOptions options, CancellationToken token = default(CancellationToken))
         {
@@ -214,7 +214,52 @@ namespace DisCache
         }
 
         /// <summary>
+        /// Asyncronously returns all key-value cache stores associated with a group
+        /// Returns null if there is no match with the group parameter
+        /// Refrains from using this if possible, as this queries the whole keyspace and may cause block in server
+        /// Use GetCacheAsync instead when possible
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="cache"></param>
+        /// <param name="group"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        public static async Task<T[]> GetCacheGroupAsync<T>(this IDistributedCache cache, string group, CancellationToken token = default(CancellationToken))
+        {
+            token.ThrowIfCancellationRequested();
+            string[] keyList = GetKeys(group);
+            if (keyList == null || keyList.Length == 0)
+                return null;
+            T[] result = new T[keyList.Length];
+            for (int i = 0; i < result.Length; ++i)
+            {
+                result[i] = await cache.GetCacheAsync<T>(keyList[i]);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Syncronous version of GetCacheGroupAsync
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="cache"></param>
+        /// <param name="group"></param>
+        /// <returns></returns>
+        public static T[] GetCacheGroup<T>(this IDistributedCache cache, string group)
+        {
+            string[] keyList = GetKeys(group);
+            T[] result = new T[keyList.Length];
+            for (int i = 0; i < result.Length; ++i)
+            {
+                result[i] = cache.GetCache<T>(keyList[i]);
+            }
+            return result;
+        }
+
+        /// <summary>
         /// Asyncronously returns all keys associated with a group in Redis
+        /// Returns an empty list if no match
+        /// Use with caution because this queries the whole keyspace, which may cause block in the server
         /// </summary>
         /// <param name="cache"></param>
         /// <param name="group"></param>
@@ -269,10 +314,14 @@ namespace DisCache
         // Clear all cache by group
         public static async Task RemoveCacheByGroupAsync(this IDistributedCache cache, string group, CancellationToken token = default(CancellationToken))
         {
+            token.ThrowIfCancellationRequested();
             string[] keyList = cache.GetKeyGroup(group);
-            foreach (string key in keyList)
+            if (keyList.Length > 0)
             {
-                await cache.RemoveAsync(key, token);
+                foreach (string key in keyList)
+                {
+                    await cache.RemoveAsync(key);
+                }
             }
         }
 
@@ -284,9 +333,12 @@ namespace DisCache
         public static void RemoveCacheByGroup(this IDistributedCache cache, string group)
         {
             string[] keyList = cache.GetKeyGroup(group);
-            foreach (string key in keyList)
+            if (keyList.Length > 0)
             {
-                cache.Remove(key);
+                foreach (string key in keyList)
+                {
+                    cache.Remove(key);
+                }
             }
         }
 
@@ -318,6 +370,7 @@ namespace DisCache
         /// <summary>
         /// Returns all keys whose string contains the input parameter. Can be use to return all keys by passing in an empty string
         /// Use with caution as this can cause block on the server
+        /// Returns an empty list if no match
         /// </summary>
         /// <param name="group"></param>
         /// <returns></returns>
