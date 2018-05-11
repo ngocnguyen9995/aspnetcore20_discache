@@ -27,6 +27,26 @@ namespace DisCache
         {
             return app.UseMiddleware<ReadCacheGroupMiddlware<T>>(options);
         }
+
+        public static IApplicationBuilder GetCacheGroupKey(this IApplicationBuilder app, CacheQueryOptions options)
+        {
+            return app.UseMiddleware<GetCacheGroupKeyMiddleware>(options);
+        }
+
+        public static IApplicationBuilder RemoveCache(this IApplicationBuilder app, CacheQueryOptions options)
+        {
+            return app.UseMiddleware<RemoveCacheMiddleware>(options);
+        }
+
+        public static IApplicationBuilder RemoveCacheGroup(this IApplicationBuilder app, CacheQueryOptions options)
+        {
+            return app.UseMiddleware<RemoveCacheGroupMiddleware>(options);
+        }
+
+        public static IApplicationBuilder RemoveAllCache(this IApplicationBuilder app)
+        {
+            return app.UseMiddleware<RemoveAllCacheMiddlware>();
+        }
     }
 
     public class WriteCacheMiddleware<T>
@@ -84,43 +104,9 @@ namespace DisCache
 
         public async Task Invoke(HttpContext context)
         {
-            var data = cache.GetCacheAsync<T>(options.Key, options.Token);
-            await context.Response.WriteAsync($"Data: {JsonConvert.SerializeObject(data.Result)}");
-
-
-            /*
-            foreach (User user in yorhaGroup)
-            {
-                await context.Response.WriteAsync($"Username: {user.Username} --- Email: {user.Email}\n");
-            }
-
-            User[] rogueGroup = cache.GetCacheGroup<User>("Rogue");
-            foreach (User user in rogueGroup)
-            {
-                await context.Response.WriteAsync($"Username: {user.Username} --- Email: {user.Email}\n");
-            }
-            foreach (string key in yorha)
-            {
-                await context.Response.WriteAsync($"key: {key}\n");
-                var user = await cache.GetCacheAsync<User>(key);
-                await context.Response.WriteAsync($"Username: {user.Username} --- Email: {user.Email}\n");
-            }
-            await context.Response.WriteAsync("Rogue group:\n");
-            foreach (string key in rogue)
-            {
-                await context.Response.WriteAsync($"key: {key}\n");
-                var user = await cache.GetCacheAsync<User>(key);
-                await context.Response.WriteAsync($"Username: {user.Username} --- Email: {user.Email}\n");
-            }
-            await context.Response.WriteAsync("God group:\n");
-            
-            foreach (string key in god)
-            {
-                await context.Response.WriteAsync($"key: {key}\n");
-                var user = await cache.GetCacheAsync<User>(key);
-                await context.Response.WriteAsync($"Username: {user.Username} --- Email: {user.Email}\n");
-            }
-            */
+            var data = await cache.GetCacheAsync<T>(options.Key, options.Token);
+            await context.Response.WriteAsync($"Data: {JsonConvert.SerializeObject(data)}\n");
+            await next(context);
         }
     }
 
@@ -139,8 +125,88 @@ namespace DisCache
 
         public async Task Invoke(HttpContext context)
         {
-            var data = cache.GetCacheGroupAsync<T>(options.Group, options.Token);
-            await context.Response.WriteAsync($"Data: {JsonConvert.SerializeObject(data.Result)}");
+            var data = await cache.GetCacheGroupAsync<T>(options.Group, options.Token);
+            await context.Response.WriteAsync($"Data: {JsonConvert.SerializeObject(data)}\n");
+            await next(context);
+        }
+    }
+
+    public class GetCacheGroupKeyMiddleware
+    {
+        private readonly RequestDelegate next;
+        private readonly IDistributedCache cache;
+        private readonly CacheQueryOptions options;
+
+        public GetCacheGroupKeyMiddleware(RequestDelegate next, IDistributedCache cache, CacheQueryOptions options)
+        {
+            this.next = next;
+            this.cache = cache;
+            this.options = options;
+        }
+
+        public async Task Invoke(HttpContext context)
+        {
+            var keys = await cache.GetKeyGroupAsync(options.Group, options.Token);
+            await context.Response.WriteAsync($"Keys: {JsonConvert.SerializeObject(keys)}\n");
+            await next(context);
+        }
+    }
+
+    public class RemoveCacheMiddleware
+    {
+        private readonly RequestDelegate next;
+        private readonly IDistributedCache cache;
+        private readonly CacheQueryOptions options;
+
+        public RemoveCacheMiddleware(RequestDelegate next, IDistributedCache cache, CacheQueryOptions options)
+        {
+            this.next = next;
+            this.cache = cache;
+            this.options = options;
+        }
+
+        public async Task Invoke(HttpContext context)
+        {
+            await cache.RemoveCacheAsync(options.Key, options.Token);
+            await next(context);
+        }
+    }
+
+    public class RemoveCacheGroupMiddleware
+    {
+        private readonly RequestDelegate next;
+        private readonly IDistributedCache cache;
+        private readonly CacheQueryOptions options;
+
+        public RemoveCacheGroupMiddleware(RequestDelegate next, IDistributedCache cache, CacheQueryOptions options)
+        {
+            this.next = next;
+            this.cache = cache;
+            this.options = options;
+        }
+
+        public async Task Invoke(HttpContext context)
+        {
+            await cache.RemoveCacheByGroupAsync(options.Group, options.Token);
+            await next(context);
+        }
+    }
+
+    public class RemoveAllCacheMiddlware
+    {
+        private readonly RequestDelegate next;
+        private readonly IDistributedCache cache;
+
+        public RemoveAllCacheMiddlware(RequestDelegate next, IDistributedCache cache)
+        {
+            this.next = next;
+            this.cache = cache;
+        }
+
+        public async Task Invoke(HttpContext context)
+        {
+            await cache.FlushAllKeysAsync();
+            await next(context);
         }
     }
 }

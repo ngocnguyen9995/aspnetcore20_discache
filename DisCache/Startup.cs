@@ -1,6 +1,7 @@
 ﻿
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -33,9 +34,28 @@ namespace DisCache
                 Value = new User { Username = "9Sx2B4ever", Email = "9Sx2B4ever@nier.com"}
             });
 
+            app.WriteCacheToGroup(new WriteCacheOptions<User>
+            {
+                Group = "Rogue",
+                Key = "2A",
+                Value = new User { Username = "A2x2B4ever", Email = "A2FanSub@nier.com"}
+            });
+
             app.ReadCacheGroup<User>(new CacheQueryOptions
             {
                 Group = "YorHa"
+            });
+
+            app.ReadCacheGroup<User>(new CacheQueryOptions
+            {
+                Group = "Rogue"
+            });
+
+            app.RemoveAllCache();
+
+            app.Run(async (context) =>
+            {
+                await context.Response.WriteAsync("Done");
             });
         }
     }
